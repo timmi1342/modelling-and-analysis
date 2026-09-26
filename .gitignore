@@ -1,0 +1,6 @@
+reference/figures/
+reference/__pycache__/
+.vercel
+.DS_Store
+Thumbs.db
+*.log

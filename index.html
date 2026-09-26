@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VSG Simulator — моделирование и анализ сигналов векторного генератора</title>
+<meta name="description" content="Программная модель векторного генератора сигналов: формирование модулированного сигнала, модель искажений тракта, визуализация и измерение EVM, ACPR, MER, SNR.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231d4ed8'/><g fill='white'><circle cx='10' cy='10' r='2.6'/><circle cx='22' cy='10' r='2.6'/><circle cx='10' cy='22' r='2.6'/><circle cx='22' cy='22' r='2.6'/></g></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <strong>VSG Simulator</strong>
+      <span>моделирование и анализ сигналов векторного генератора</span>
+    </div>
+
+    <label for="preset">Предустановка</label>
+    <select id="preset" style="max-width:250px"></select>
+
+    <button class="btn" id="themeBtn" type="button">Тёмная тема</button>
+    <button class="btn" id="reportBtn" type="button">Отчёт PDF</button>
+    <button class="btn btn-primary" id="runBtn" type="button">Рассчитать</button>
+    <span class="status" id="status"></span>
+  </header>
+
+  <aside class="sidebar">
+
+    <details class="group" open>
+      <summary>Параметры сигнала</summary>
+      <div class="group-body">
+
+        <div class="field">
+          <label for="modulation">Схема модуляции</label>
+          <select id="modulation" data-bind="modulation" data-kind="string">
+            <option value="BPSK">BPSK</option>
+            <option value="QPSK">QPSK</option>
+            <option value="8PSK">8-PSK</option>
+            <option value="16QAM">16-QAM</option>
+            <option value="64QAM">64-QAM</option>
+          </select>
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="carrier" id="carrierLabel">Несущая частота, МГц</label>
+          <input type="number" id="carrier" data-bind="carrierHz" data-scale="1e6" step="1" min="0.1">
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="power">Уровень выходной мощности, дБм</label>
+          <div class="slider">
+            <input type="range" data-bind="powerDbm" min="-80" max="30" step="1">
+            <input type="number" id="power" data-bind="powerDbm" step="1">
+          </div>
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="symrate">Символьная скорость, МСимв/с</label>
+          <input type="number" id="symrate" data-bind="symbolRate" data-scale="1e6" step="0.1" min="0.001">
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="source">Источник данных</label>
+          <select id="source" data-bind="source" data-kind="string">
+            <option value="prbs">Псевдослучайная последовательность PRBS</option>
+            <option value="random">Случайные биты</option>
+            <option value="user">Пользовательский набор данных</option>
+          </select>
+          <div class="error"></div>
+        </div>
+
+        <div class="field" data-when="prbs">
+          <label for="prbsType">Тип последовательности</label>
+          <select id="prbsType" data-bind="prbsType" data-kind="string"></select>
+          <div class="error"></div>
+        </div>
+
+        <div class="field" data-when="user">
+          <label for="userFormat">Формат пользовательских данных</label>
+          <select id="userFormat" data-bind="userFormat" data-kind="string">
+            <option value="bin">двоичная запись</option>
+            <option value="hex">шестнадцатеричная запись</option>
+            <option value="text">текст</option>
+          </select>
+          <div class="error"></div>
+        </div>
+
+        <div class="field" data-when="user">
+          <label for="userData">Пользовательский набор данных</label>
+          <textarea id="userData" data-bind="userData" data-kind="string"
+            placeholder="например 10110010 01101001"></textarea>
+          <div class="hint">Набор повторяется циклически до нужного числа символов.</div>
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="seed">Зерно генератора (воспроизводимость)</label>
+          <input type="number" id="seed" data-bind="seed" step="1" min="0">
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="filterType">Тип формирующего фильтра</label>
+          <select id="filterType" disabled>
+            <option>RRC (корень из приподнятого косинуса)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="alpha">Коэффициент сглаживания α</label>
+          <div class="slider">
+            <input type="range" data-bind="alpha" min="0" max="1" step="0.01">
+            <input type="number" id="alpha" data-bind="alpha" step="0.01" min="0" max="1">
+          </div>
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="span">Длительность характеристики фильтра, симв.</label>
+          <div class="slider">
+            <input type="range" data-bind="span" min="2" max="32" step="2">
+            <input type="number" id="span" data-bind="span" step="2" min="2" max="32">
+          </div>
+          <div class="hint">Малое значение увеличивает межсимвольную помеху.</div>
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="sps">Отсчётов на символ</label>
+          <div class="slider">
+            <input type="range" data-bind="sps" min="2" max="32" step="2">
+            <input type="number" id="sps" data-bind="sps" step="2" min="2" max="32">
+          </div>
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="nSymbols">Число символов</label>
+          <input type="number" id="nSymbols" data-bind="nSymbols" step="128" min="64" max="16384">
+          <div class="error"></div>
+        </div>
+
+      </div>
+    </details>
+
+    <details class="group" open>
+      <summary>Модель искажений</summary>
+      <div class="group-body">
+
+        <label class="switch">
+          <input type="checkbox" data-bind="iq.on" data-kind="bool">
+          Рассогласование квадратурных каналов
+        </label>
+        <div class="field">
+          <label>Амплитудное рассогласование, дБ</label>
+          <div class="slider">
+            <input type="range" data-bind="iq.gainDb" min="-6" max="6" step="0.1">
+            <input type="number" id="iqGain" data-bind="iq.gainDb" step="0.1">
+          </div>
+          <div class="error"></div>
+        </div>
+        <div class="field">
+          <label>Фазовое рассогласование, градусы</label>
+          <div class="slider">
+            <input type="range" data-bind="iq.phaseDeg" min="-45" max="45" step="0.5">
+            <input type="number" id="iqPhase" data-bind="iq.phaseDeg" step="0.5">
+          </div>
+          <div class="error"></div>
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" data-bind="dc.on" data-kind="bool">
+          Смещение постоянной составляющей
+        </label>
+        <div class="field">
+          <label>Смещение по оси I, % от СКЗ</label>
+          <div class="slider">
+            <input type="range" data-bind="dc.iPct" min="-50" max="50" step="0.5">
+            <input type="number" id="dcI" data-bind="dc.iPct" step="0.5">
+          </div>
+          <div class="error"></div>
+        </div>
+        <div class="field">
+          <label>Смещение по оси Q, % от СКЗ</label>
+          <div class="slider">
+            <input type="range" data-bind="dc.qPct" min="-50" max="50" step="0.5">
+            <input type="number" id="dcQ" data-bind="dc.qPct" step="0.5">
+          </div>
+          <div class="error"></div>
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" data-bind="pn.on" data-kind="bool">
+          Фазовый шум гетеродина
+        </label>
+        <div class="field">
+          <label>Уровень, дБн/Гц</label>
+          <div class="slider">
+            <input type="range" data-bind="pn.levelDbc" min="-160" max="-40" step="1">
+            <input type="number" id="pnLevel" data-bind="pn.levelDbc" step="1">
+          </div>
+          <div class="error"></div>
+        </div>
+        <div class="field">
+          <label>Отстройка, кГц</label>
+          <input type="number" id="pnOffset" data-bind="pn.offsetHz" data-scale="1e3" step="10">
+          <div class="error"></div>
+        </div>
+        <div class="field">
+          <label>Полоса системы фазовой автоподстройки, кГц</label>
+          <input type="number" id="pnLoop" data-bind="pn.loopBwHz" data-scale="1e3" step="1">
+          <div class="error"></div>
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" data-bind="pa.on" data-kind="bool">
+          Нелинейность усилителя мощности
+        </label>
+        <div class="field">
+          <label for="paModel">Модель усилителя</label>
+          <select id="paModel" data-bind="pa.model" data-kind="string">
+            <option value="saleh">Салеха (AM/AM и AM/PM)</option>
+            <option value="rapp">Раппа (только AM/AM)</option>
+          </select>
+          <div class="error"></div>
+        </div>
+        <div class="field">
+          <label>Отступ от точки насыщения, дБ</label>
+          <div class="slider">
+            <input type="range" data-bind="pa.backoffDb" min="0" max="30" step="0.5">
+            <input type="number" id="paBackoff" data-bind="pa.backoffDb" step="0.5">
+          </div>
+          <div class="error"></div>
+        </div>
+        <div class="field">
+          <label>Гладкость характеристики (модель Раппа)</label>
+          <div class="slider">
+            <input type="range" data-bind="pa.smoothness" min="0.5" max="10" step="0.5">
+            <input type="number" id="paSharp" data-bind="pa.smoothness" step="0.5">
+          </div>
+          <div class="error"></div>
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" data-bind="awgn.on" data-kind="bool">
+          Аддитивный белый гауссовский шум
+        </label>
+        <div class="field">
+          <label>Отношение сигнал/шум, дБ</label>
+          <div class="slider">
+            <input type="range" data-bind="awgn.snrDb" min="-10" max="60" step="0.5">
+            <input type="number" id="snr" data-bind="awgn.snrDb" step="0.5">
+          </div>
+          <div class="error"></div>
+        </div>
+
+      </div>
+    </details>
+
+    <details class="group">
+      <summary>Измерения и пороги</summary>
+      <div class="group-body">
+
+        <div class="field">
+          <label for="evmMode">Опорное созвездие для расчёта EVM</label>
+          <select id="evmMode" data-bind="evmMode" data-kind="string">
+            <option value="reference">переданные символы (известны точно)</option>
+            <option value="decision">результат жёсткого решения</option>
+          </select>
+          <div class="error"></div>
+        </div>
+
+        <div class="field">
+          <label for="limEvm">Порог EVM (среднеквадратическое), %</label>
+          <input type="number" id="limEvm" data-bind="limits.evmPct" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="limEvmPeak">Порог EVM (пиковое), %</label>
+          <input type="number" id="limEvmPeak" data-bind="limits.evmPeakPct" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="limMer">Порог MER, дБ, не менее</label>
+          <input type="number" id="limMer" data-bind="limits.merDb" step="0.5">
+        </div>
+        <div class="field">
+          <label for="limSnr">Порог SNR, дБ, не менее</label>
+          <input type="number" id="limSnr" data-bind="limits.snrDb" step="0.5">
+        </div>
+        <div class="field">
+          <label for="limAcpr">Порог ACPR, дБн, не более</label>
+          <input type="number" id="limAcpr" data-bind="limits.acprDb" step="0.5">
+        </div>
+
+      </div>
+    </details>
+
+    <details class="group">
+      <summary>Экспорт</summary>
+      <div class="group-body">
+        <div class="field">
+          <button class="btn" id="exportPlotsPdf" type="button" style="width:100%">Графики в PDF</button>
+        </div>
+        <div class="field">
+          <button class="btn" id="exportCsv" type="button" style="width:100%">Данные I/Q в CSV</button>
+        </div>
+        <div class="field">
+          <button class="btn" id="exportWav" type="button" style="width:100%">Данные I/Q в WAV</button>
+        </div>
+        <div class="hint">
+          Файл WAV содержит два канала: левый — I, правый — Q. Формат читается программами
+          работы с SDR.
+        </div>
+      </div>
+    </details>
+
+    <details class="group">
+      <summary>Настройки</summary>
+      <div class="group-body">
+
+        <div class="field">
+          <label for="theme">Оформление интерфейса</label>
+          <select id="theme">
+            <option value="light">светлая тема</option>
+            <option value="dark">тёмная тема</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="freqUnit">Единицы измерения частоты</label>
+          <select id="freqUnit">
+            <option value="1e6">МГц</option>
+            <option value="1e9">ГГц</option>
+          </select>
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" id="autoRun" checked>
+          Автоматический пересчёт при изменении параметров
+        </label>
+
+        <label class="switch">
+          <input type="checkbox" id="eyeQ">
+          Показывать Q(t) на глазковой диаграмме
+        </label>
+
+        <div class="field">
+          <button class="btn" id="saveCfg" type="button" style="width:100%">Сохранить конфигурацию</button>
+        </div>
+        <div class="field">
+          <button class="btn" id="loadCfgBtn" type="button" style="width:100%">Загрузить конфигурацию</button>
+          <input type="file" id="loadCfg" accept="application/json,.json" hidden>
+        </div>
+        <div class="field">
+          <button class="btn" id="resetCfg" type="button" style="width:100%">Сбросить к значениям по умолчанию</button>
+        </div>
+
+        <div class="hint">
+          Проверка вычислительного ядра: <a href="tests/" target="_blank">открыть самотест</a>.
+        </div>
+
+      </div>
+    </details>
+
+  </aside>
+
+  <main class="main">
+
+    <div class="banner" id="banner" hidden></div>
+
+    <section class="metrics">
+      <div class="metrics-head">
+        <h2>Результаты измерений</h2>
+        <span class="status" id="signalInfo"></span>
+        <span class="spacer"></span>
+        <span class="verdict" id="verdict"></span>
+      </div>
+      <table class="results">
+        <thead>
+          <tr>
+            <th>Параметр</th>
+            <th>Значение</th>
+            <th>Дополнительно</th>
+            <th>Норма</th>
+            <th>Заключение</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </section>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="plots" id="plots">
+      <section class="plot" data-plot="constellation">
+        <canvas id="cvConstellation"></canvas>
+        <div class="plot-actions"><button type="button" data-png="constellation">PNG</button></div>
+      </section>
+      <section class="plot" data-plot="spectrum">
+        <canvas id="cvSpectrum"></canvas>
+        <div class="plot-actions"><button type="button" data-png="spectrum">PNG</button></div>
+      </section>
+      <section class="plot" data-plot="vector">
+        <canvas id="cvVector"></canvas>
+        <div class="plot-actions"><button type="button" data-png="vector">PNG</button></div>
+      </section>
+      <section class="plot" data-plot="eye">
+        <canvas id="cvEye"></canvas>
+        <div class="plot-actions"><button type="button" data-png="eye">PNG</button></div>
+      </section>
+      <section class="plot" data-plot="time">
+        <canvas id="cvTime"></canvas>
+        <div class="plot-actions"><button type="button" data-png="time">PNG</button></div>
+      </section>
+      <section class="plot" data-plot="pa">
+        <canvas id="cvPa"></canvas>
+        <div class="plot-actions"><button type="button" data-png="pa">PNG</button></div>
+      </section>
+    </div>
+
+  </main>
+
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

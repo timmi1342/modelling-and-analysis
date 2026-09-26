@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Проверка вычислительного ядра VSG Simulator</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #12151c; color: #e6e9ef; }
+    h1 { font-size: 18px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    td { padding: 6px 10px; border-bottom: 1px solid #2a2f3a; vertical-align: top; }
+    .ok { color: #4ade80; font-weight: 600; }
+    .fail { color: #f87171; font-weight: 600; }
+    .detail { color: #98a2b3; }
+    #summary { margin: 12px 0; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <h1>Проверка вычислительного ядра</h1>
+  <div id="summary">Выполняется…</div>
+  <table id="out"></table>
+
+  <script type="module">
+    import { run } from './selftest.js';
+
+    const rows = run();
+    const table = document.getElementById('out');
+    let passed = 0;
+
+    for (const r of rows) {
+      if (r.pass) passed++;
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td class="${r.pass ? 'ok' : 'fail'}">${r.pass ? 'ОК' : 'ОШИБКА'}</td>` +
+        `<td>${r.name}</td><td class="detail">${r.detail}</td>`;
+      table.appendChild(tr);
+    }
+
+    const summary = `Пройдено ${passed} из ${rows.length}`;
+    document.getElementById('summary').textContent = summary;
+    console.log('SELFTEST', summary);
+    for (const r of rows) {
+      if (!r.pass) console.error('FAIL:', r.name, r.detail);
+    }
+    window.__selftest = { passed, total: rows.length, rows };
+  </script>
+</body>
+</html>
